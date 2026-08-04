@@ -8,8 +8,36 @@
  * helpers are thin DOM wrappers.
  */
 import type { State } from "../types";
-import { CURRENT_SCHEMA, normalizeState, schemaOf } from "./storage";
+import { CURRENT_SCHEMA, normalizeState, schemaOf, type KV } from "./storage";
 import { today } from "./time";
+
+/* ── export freshness (the "back up once in a while" nag) ───── */
+
+export const LAST_EXPORT_KEY = "critter-counter/last-export";
+
+export function markExported(kv: KV): void {
+  try {
+    kv.setItem(LAST_EXPORT_KEY, new Date().toISOString());
+  } catch {
+    /* best-effort */
+  }
+}
+
+export function lastExportedAt(kv: KV): string | null {
+  try {
+    return kv.getItem(LAST_EXPORT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Whole days since the ISO datetime; null when it never happened. */
+export function daysSince(iso: string | null, now: Date = new Date()): number | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  return Math.max(0, Math.floor((now.getTime() - then) / 86400000));
+}
 
 export const BACKUP_VERSION = 1;
 
