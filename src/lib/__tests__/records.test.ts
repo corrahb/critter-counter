@@ -96,7 +96,7 @@ describe("applyWalkToRecords", () => {
       mins: 120,
       date: "2026-08-04",
     });
-    expect(beaten).toEqual(["30 rabbits", "3 wild turkeys", "15 on Bunny Road", "2h walked"]);
+    expect(beaten).toEqual(["30 rabbits", "3 turkeys", "15 on Bunny Road", "2h walked"]);
   });
 
   it("singular message for a first-ever single sighting", () => {

@@ -3,7 +3,7 @@ import type { Records, Species, WeatherId } from "../types";
 export const DEFAULT_SPECIES: Species[] = [
   { id: "rabbit", name: "Rabbit", icon: "🐇" },
   { id: "raccoon", name: "Raccoon", icon: "🦝" },
-  { id: "turkey", name: "Wild turkey", icon: "🦃" },
+  { id: "turkey", name: "Turkey", icon: "🦃" }, // was "Wild turkey" — renamed 2026-08-04, see normalizeSpecies
   { id: "cat", name: "Cat", icon: "🐈" },
 ];
 

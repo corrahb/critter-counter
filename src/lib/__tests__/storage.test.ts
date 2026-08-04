@@ -101,7 +101,13 @@ const artefactShape = {
       note: "two kits under the hedge",
     },
   ],
-  species: [...DEFAULT_SPECIES, { id: "fox-a1b2", name: "Fox", icon: "🦊", custom: true }],
+  species: [
+    { id: "rabbit", name: "Rabbit", icon: "🐇" },
+    { id: "raccoon", name: "Raccoon", icon: "🦝" },
+    { id: "turkey", name: "Wild turkey", icon: "🦃" }, // pre-rename name, as real old backups have
+    { id: "cat", name: "Cat", icon: "🐈" },
+    { id: "fox-a1b2", name: "Fox", icon: "🦊", custom: true },
+  ],
   records: {
     rabbit: { value: 25 }, // saved before dates existed
     road: { value: 11, date: "2026-08-02" },
@@ -159,6 +165,8 @@ describe("normalizeState — nothing is lost on migration", () => {
     expect(s.walks[1].note).toBe("two kits under the hedge");
     expect(s.species).toHaveLength(5);
     expect(s.species[4]).toEqual({ id: "fox-a1b2", name: "Fox", icon: "🦊", custom: true });
+    // the 2026-08-04 rename migrates the default's old name in old backups
+    expect(s.species[2]).toEqual({ id: "turkey", name: "Turkey", icon: "🦃" });
   });
 
   it("recovers the seed date for a record saved before dates existed, when the value still matches", () => {

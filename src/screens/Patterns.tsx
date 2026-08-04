@@ -441,7 +441,7 @@ export function Patterns({
       <div style={{ ...card, borderStyle: "dashed" }}>
         <Eyebrow>Backup</Eyebrow>
         <div style={{ fontSize: 13, color: C.sage, marginTop: 9, lineHeight: 1.5 }}>
-          Download a backup file every so often and tuck it into iCloud Drive — that copy survives
+          Download a backup file every so often and tuck it into Google Drive — that copy survives
           anything that happens to this phone or app.
           {exportAge == null
             ? " You haven't exported one yet."

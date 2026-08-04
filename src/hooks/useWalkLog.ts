@@ -244,7 +244,7 @@ export function useWalkLog(): WalkLog {
     downloadBackupFile(currentState());
     markExported(kv);
     setStorageTick((t) => t + 1);
-    setToast("Backup file saved. Tuck it into iCloud Drive or Files.");
+    setToast("Backup file saved. Tuck it into Google Drive somewhere safe.");
   };
 
   const applyRestoredState = (state: State, what: string): boolean => {

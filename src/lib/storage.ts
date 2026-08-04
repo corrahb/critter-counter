@@ -113,9 +113,13 @@ export function normalizeSpecies(raw: any): Species[] {
   const out: Species[] = [];
   for (const s of raw) {
     if (s && typeof s.id === "string" && s.id && typeof s.name === "string" && s.name) {
+      // the default turkey was renamed "Wild turkey" → "Turkey" (2026-08-04);
+      // migrate exactly that pairing so old backups pick up the new name,
+      // while any custom naming is left alone
+      const name = s.id === "turkey" && s.name === "Wild turkey" ? "Turkey" : s.name;
       out.push({
         id: s.id,
-        name: s.name,
+        name,
         icon: typeof s.icon === "string" && s.icon ? s.icon : "🐾",
         ...(s.custom ? { custom: true } : {}),
       });
