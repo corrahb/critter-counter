@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useWalkLog } from "./hooks/useWalkLog";
+import { ICONS } from "./data/constants";
+import type { PatternsForm, TonightForm } from "./screens/forms";
 import { C, css, shell } from "./theme";
 import { Eyebrow } from "./components/bits";
 import { Tally } from "./components/Tally";
@@ -14,6 +16,21 @@ type View = "tonight" | "walks" | "patterns";
 export default function App() {
   const log = useWalkLog();
   const [view, setView] = useState<View>("tonight");
+
+  /* Ephemeral form state lives HERE, not in the screens — the prototype
+     kept it top-level, so an accidental tab switch never loses an open
+     add-critter form or a pasted-but-unrestored backup. */
+  const [tonightForm, setTonightForm] = useState<TonightForm>({
+    adding: false,
+    newName: "",
+    newIcon: ICONS[0],
+  });
+  const [patternsForm, setPatternsForm] = useState<PatternsForm>({
+    backupText: "",
+    restoreOpen: false,
+    restoreText: "",
+    safetyOpen: false,
+  });
 
   const draftTotal = sum(log.draft.counts);
   const onRoad = (log.draft.road || 0) > 0;
@@ -109,10 +126,15 @@ export default function App() {
       )}
 
       {view === "tonight" && (
-        <Tonight log={log} onSaved={(beat) => setView(beat ? "patterns" : "walks")} />
+        <Tonight
+          log={log}
+          form={tonightForm}
+          setForm={setTonightForm}
+          onSaved={(beat) => setView(beat ? "patterns" : "walks")}
+        />
       )}
       {view === "walks" && <Walks log={log} />}
-      {view === "patterns" && <Patterns log={log} />}
+      {view === "patterns" && <Patterns log={log} form={patternsForm} setForm={setPatternsForm} />}
 
       {/* toast */}
       {log.toast && (

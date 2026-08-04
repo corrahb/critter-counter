@@ -1,6 +1,7 @@
 /* ── TONIGHT — the counting screen, ported exactly ──────────── */
-import { useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type { WalkLog } from "../hooks/useWalkLog";
+import type { TonightForm } from "./forms";
 import { C, card, ghostBtn, primaryBtn } from "../theme";
 import { Eyebrow, StepButton } from "../components/bits";
 import { Tally } from "../components/Tally";
@@ -8,11 +9,22 @@ import { ICONS, WEATHER } from "../data/constants";
 import { fmtMins, fmtTime, minsBetween, today } from "../lib/time";
 import { moonOf } from "../lib/moon";
 
-export function Tonight({ log, onSaved }: { log: WalkLog; onSaved: (beat: boolean) => void }) {
+export function Tonight({
+  log,
+  form,
+  setForm,
+  onSaved,
+}: {
+  log: WalkLog;
+  form: TonightForm;
+  setForm: Dispatch<SetStateAction<TonightForm>>;
+  onSaved: (beat: boolean) => void;
+}) {
   const { draft, species, bump, bumpRoad, setRoad, setDraftField } = log;
-  const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newIcon, setNewIcon] = useState(ICONS[0]);
+  const { adding, newName, newIcon } = form;
+  const setAdding = (adding: boolean) => setForm((f) => ({ ...f, adding }));
+  const setNewName = (newName: string) => setForm((f) => ({ ...f, newName }));
+  const setNewIcon = (newIcon: string) => setForm((f) => ({ ...f, newIcon }));
 
   const draftRoad = draft.road || 0;
   const onRoad = draftRoad > 0;
@@ -200,9 +212,12 @@ export function Tonight({ log, onSaved }: { log: WalkLog; onSaved: (beat: boolea
           <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
             <button
               onClick={() => {
-                log.addSpecies(newName, newIcon);
-                setNewName("");
-                setAdding(false);
+                // only close on a real add — a blank name (or a storage
+                // failure) keeps the form and its icon selection open
+                if (log.addSpecies(newName, newIcon)) {
+                  setNewName("");
+                  setAdding(false);
+                }
               }}
               className="tap"
               style={{ ...primaryBtn, flex: 1 }}

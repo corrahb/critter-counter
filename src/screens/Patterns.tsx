@@ -1,6 +1,7 @@
 /* ── PATTERNS — records, stats, backup; ported + backup upgrades ── */
-import { useMemo, useState } from "react";
+import { useMemo, type Dispatch, type SetStateAction } from "react";
 import type { WalkLog } from "../hooks/useWalkLog";
+import type { PatternsForm } from "./forms";
 import { C, card, ghostBtn, primaryBtn } from "../theme";
 import { Eyebrow } from "../components/bits";
 import { Tally } from "../components/Tally";
@@ -10,12 +11,23 @@ import { plural } from "../lib/plural";
 import { computeStats, sum } from "../lib/stats";
 import { daysSince } from "../lib/backup";
 
-export function Patterns({ log }: { log: WalkLog }) {
+export function Patterns({
+  log,
+  form,
+  setForm,
+}: {
+  log: WalkLog;
+  form: PatternsForm;
+  setForm: Dispatch<SetStateAction<PatternsForm>>;
+}) {
   const { walks, species, records } = log;
-  const [backupText, setBackupText] = useState("");
-  const [restoreOpen, setRestoreOpen] = useState(false);
-  const [restoreText, setRestoreText] = useState("");
-  const [safetyOpen, setSafetyOpen] = useState(false);
+  const { backupText, restoreOpen, restoreText, safetyOpen } = form;
+  const setBackupText = (backupText: string) => setForm((f) => ({ ...f, backupText }));
+  const setRestoreOpen = (v: boolean | ((prev: boolean) => boolean)) =>
+    setForm((f) => ({ ...f, restoreOpen: typeof v === "function" ? v(f.restoreOpen) : v }));
+  const setRestoreText = (restoreText: string) => setForm((f) => ({ ...f, restoreText }));
+  const setSafetyOpen = (v: boolean | ((prev: boolean) => boolean)) =>
+    setForm((f) => ({ ...f, safetyOpen: typeof v === "function" ? v(f.safetyOpen) : v }));
 
   const stats = useMemo(() => computeStats(walks), [walks]);
   const exportAge = daysSince(log.lastExport);
@@ -536,10 +548,12 @@ export function Patterns({ log }: { log: WalkLog }) {
       <div style={{ ...card, borderStyle: "dashed" }}>
         <button
           onClick={() => setSafetyOpen((v) => !v)}
+          className="tap"
           style={{
             background: "none",
             border: "none",
             padding: 0,
+            minHeight: 34, // spec: every tap target ≥ 34px
             width: "100%",
             display: "flex",
             justifyContent: "space-between",
@@ -579,7 +593,7 @@ export function Patterns({ log }: { log: WalkLog }) {
                 <button
                   onClick={() => log.restoreSnapshot(s.date)}
                   className="tap"
-                  style={{ ...ghostBtn, padding: "8px 13px", fontSize: 13, flexShrink: 0 }}
+                  style={{ ...ghostBtn, padding: "9px 13px", fontSize: 13, minHeight: 34, flexShrink: 0 }}
                 >
                   Restore
                 </button>
@@ -600,7 +614,7 @@ export function Patterns({ log }: { log: WalkLog }) {
                     <button
                       onClick={() => log.undoRestore(p.ts)}
                       className="tap"
-                      style={{ ...ghostBtn, padding: "8px 13px", fontSize: 13, flexShrink: 0 }}
+                      style={{ ...ghostBtn, padding: "9px 13px", fontSize: 13, minHeight: 34, flexShrink: 0 }}
                     >
                       Bring back
                     </button>

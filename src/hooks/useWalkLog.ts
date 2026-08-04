@@ -4,7 +4,7 @@
  * refuse-to-shrink guard surfaced as an error banner, the debounced
  * draft autosave, and every user action.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Draft, Records, Species, State, Walk } from "../types";
 import {
   StorageError,
@@ -56,7 +56,8 @@ export interface WalkLog {
   /** Returns true when a record was beaten, null when nothing to save. */
   saveWalk: () => boolean | null;
   deleteWalk: (id: string) => void;
-  addSpecies: (name: string, icon: string) => void;
+  /** Returns true when the species was actually added (name non-blank, persisted). */
+  addSpecies: (name: string, icon: string) => boolean;
   removeSpecies: (id: string) => void;
   setRecord: (key: string, raw: string) => void;
   setRecordDate: (key: string, iso: string) => void;
@@ -82,11 +83,15 @@ export function useWalkLog(): WalkLog {
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstRun = useRef(true);
 
-  /* snapshot/pre-restore lists refresh whenever storage changes */
-  const snapshots = listSnapshots(kv);
-  const preRestores = listPreRestores(kv);
-  const lastExport = lastExportedAt(kv);
-  void storageTick;
+  /* snapshot/pre-restore lists: full-state JSON parses, so recompute only
+     when storage actually changes (every persist/markExported bumps the
+     tick) — not on every tally-tap re-render */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const snapshots = useMemo(() => listSnapshots(kv), [storageTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const preRestores = useMemo(() => listPreRestores(kv), [storageTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lastExport = useMemo(() => lastExportedAt(kv), [storageTick]);
 
   const persist = (
     next: Partial<State>,
@@ -182,13 +187,14 @@ export function useWalkLog(): WalkLog {
     setToast("Walk deleted.");
   };
 
-  const addSpecies = (name: string, icon: string) => {
+  const addSpecies = (name: string, icon: string): boolean => {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
     const id = trimmed.toLowerCase().replace(/\s+/g, "-") + "-" + Math.random().toString(36).slice(2, 6);
     const next = [...species, { id, name: trimmed, icon: icon || ICONS[0], custom: true }];
-    if (!persist({ species: next })) return;
+    if (!persist({ species: next })) return false;
     setSpecies(next);
+    return true;
   };
 
   const removeSpecies = (id: string) => {
@@ -203,8 +209,11 @@ export function useWalkLog(): WalkLog {
       ...records,
       [key]: { value: isNaN(v) ? 0 : Math.min(v, 9999), date: records[key]?.date ?? null },
     };
+    // persist-first like every other action: on StorageError the input
+    // snaps back and the banner explains, instead of showing an accepted
+    // edit that storage never took
+    if (!persist({ records: next })) return;
     setRecords(next);
-    persist({ records: next });
   };
 
   const setRecordDate = (key: string, iso: string) => {
@@ -212,8 +221,8 @@ export function useWalkLog(): WalkLog {
       ...records,
       [key]: { ...(records[key] || { value: 0 }), date: iso || null },
     };
+    if (!persist({ records: next })) return;
     setRecords(next);
-    persist({ records: next });
   };
 
   const currentState = (): State => ({ walks, species, records });
@@ -244,7 +253,7 @@ export function useWalkLog(): WalkLog {
     setSpecies(state.species);
     setRecords(state.records);
     setToast(
-      `Restored ${state.walks.length} ${state.walks.length === 1 ? "walk" : "walks"} ${what} — undo is under Backup.`,
+      `Restored ${state.walks.length} ${state.walks.length === 1 ? "walk" : "walks"} ${what} — undo is under Safety net.`,
     );
     return true;
   };
