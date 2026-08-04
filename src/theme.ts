@@ -58,10 +58,33 @@ export const shell: CSSProperties = {
   paddingBottom: "calc(96px + env(safe-area-inset-bottom))",
 };
 
-/* Global styles. The Google Fonts @import is temporary — phase 3
-   self-hosts Fraunces/Karla/Azeret Mono as woff2 for offline. */
+/* Global styles. Fonts are SELF-HOSTED (public/fonts) so the whole
+   visual identity works offline — no CDN. Fraunces is the variable
+   build with the SOFT and WONK axes the design depends on. */
+const B = import.meta.env.BASE_URL;
+
 export const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..700,0..100,0..1&family=Karla:wght@400;500;700&family=Azeret+Mono:wght@400;500;700&display=swap');
+  @font-face {
+    font-family: 'Fraunces';
+    src: url('${B}fonts/fraunces.woff2') format('woff2');
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Karla';
+    src: url('${B}fonts/karla.woff2') format('woff2');
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Azeret Mono';
+    src: url('${B}fonts/azeret.woff2') format('woff2');
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   .tk { animation: draw .34s ease-out backwards; }
   @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
