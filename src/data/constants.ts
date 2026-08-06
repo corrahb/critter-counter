@@ -8,7 +8,7 @@ export const DEFAULT_SPECIES: Species[] = [
 ];
 
 /** Emoji picker for custom critters. */
-export const ICONS = ["🦌", "🦊", "🦨", "🐿️", "🦫", "🐦", "🦉", "🦆", "🐸", "🐢", "🦇", "🐺", "🦡", "🐻"];
+export const ICONS = ["🦌", "🦊", "🦨", "🐿️", "🦫", "🐦", "🦉", "🦆", "🐸", "🐢", "🦇", "🐺", "🦡", "🐻", "🐕"];
 
 /** Standing bests — editable, and beaten automatically by a logged walk. */
 export const SEED_RECORDS: Records = {
