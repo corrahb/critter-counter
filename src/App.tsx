@@ -24,6 +24,7 @@ export default function App() {
     adding: false,
     newName: "",
     newIcon: ICONS[0],
+    manualTimes: false,
   });
   const [patternsForm, setPatternsForm] = useState<PatternsForm>({
     backupText: "",

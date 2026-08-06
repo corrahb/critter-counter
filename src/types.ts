@@ -36,6 +36,8 @@ export interface Draft {
   endTime: string;
   weather: WeatherId | null;
   note: string;
+  /** True between Start walk and Stop walk — drives the live timer. */
+  walking?: boolean;
 }
 
 /** A personal best. Key is a species id, "road", or "duration". */

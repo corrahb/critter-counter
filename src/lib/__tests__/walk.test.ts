@@ -34,8 +34,10 @@ describe("isDraftSaveable — 'a walk can save on any ONE of counts, Bunny Road,
     expect(isDraftSaveable(draft({ time: "20:00" }))).toBe(false);
   });
 
-  it("identical start and end give zero minutes — still not saveable", () => {
-    expect(isDraftSaveable(draft({ time: "20:00", endTime: "20:00" }))).toBe(false);
+  it("both ends stamped in the same minute IS a range — a cut-short timed walk still saves", () => {
+    expect(isDraftSaveable(draft({ time: "20:00", endTime: "20:00" }))).toBe(true);
+    // and it stores with duration null, not 0
+    expect(walkFromDraft(draft({ time: "20:00", endTime: "20:00" })).duration).toBeNull();
   });
 
   it("a note alone does not make a walk", () => {

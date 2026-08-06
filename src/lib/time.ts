@@ -50,9 +50,16 @@ export const hourLabel = (h: number): string => {
  * with TOMORROW's date. This app is used in the evening, so that was wrong
  * most nights it was used.
  */
-export const today = (): string => {
+const localISO = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export const today = (): string => localISO(new Date());
+
+/** Yesterday's LOCAL date — the grace window for a walk that crossed midnight. */
+export const yesterday = (): string => {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  d.setDate(d.getDate() - 1);
+  return localISO(d);
 };
 
 /** "2026-08-04" → "Tue, Aug 4" (locale-aware). */

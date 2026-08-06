@@ -25,6 +25,7 @@ import {
 } from "../lib/storage";
 import { applyWalkToRecords } from "../lib/records";
 import { isDraftSaveable, walkFromDraft } from "../lib/walk";
+import { today } from "../lib/time";
 import {
   lastExportedAt,
   markExported,
@@ -53,6 +54,10 @@ export interface WalkLog {
   bumpRoad: (delta: number) => void;
   setRoad: (raw: string) => void;
   setDraftField: <K extends keyof Draft>(field: K, value: Draft[K]) => void;
+  /** Stamps the start time now and begins the live timer. */
+  startWalk: () => void;
+  /** Stamps the end time now and stops the timer. */
+  stopWalk: () => void;
   /** Returns true when a record was beaten, null when nothing to save. */
   saveWalk: () => boolean | null;
   deleteWalk: (id: string) => void;
@@ -132,6 +137,23 @@ export function useWalkLog(): WalkLog {
     };
   }, [draft]);
 
+  /* flush the draft the instant the app is backgrounded/closed, so taps
+     inside the debounce window survive a swipe-away */
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  useEffect(() => {
+    const flush = () => saveDraft(kv, draftRef.current);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(""), 2600);
@@ -155,12 +177,38 @@ export function useWalkLog(): WalkLog {
   const setDraftField = <K extends keyof Draft>(field: K, value: Draft[K]) =>
     setDraft((d) => ({ ...d, [field]: value }));
 
+  const nowHHMM = () => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+
+  /* Start/Stop are single moment-anchored events — they persist
+     SYNCHRONOUSLY instead of riding the 900ms tally debounce, so
+     pocketing the phone right after the tap can't lose the stamp. */
+  const startWalk = () => {
+    // starting a live walk means the walk is happening NOW — re-stamp the
+    // date too, so a leftover backdated draft can't mislabel it
+    const next: Draft = { ...draft, date: today(), time: nowHHMM(), endTime: "", walking: true };
+    setDraft(next);
+    saveDraft(kv, next);
+  };
+
+  const stopWalk = () => {
+    const next: Draft = { ...draft, endTime: nowHHMM(), walking: false };
+    setDraft(next);
+    saveDraft(kv, next);
+  };
+
   const saveWalk = (): boolean | null => {
-    if (!isDraftSaveable(draft)) {
+    // saving mid-walk means the walk ends now — never silently discard
+    // the duration the Stop button was displaying
+    const effective: Draft =
+      draft.walking && draft.time ? { ...draft, endTime: nowHHMM(), walking: false } : draft;
+    if (!isDraftSaveable(effective)) {
       setToast("Nothing to save yet — add a sighting or when you walked.");
       return null;
     }
-    const walk = walkFromDraft(draft);
+    const walk = walkFromDraft(effective);
     const { records: nextRecords, beaten } = applyWalkToRecords({
       records,
       species,
@@ -311,6 +359,8 @@ export function useWalkLog(): WalkLog {
     bumpRoad,
     setRoad,
     setDraftField,
+    startWalk,
+    stopWalk,
     saveWalk,
     deleteWalk,
     addSpecies,

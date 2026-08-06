@@ -4,6 +4,8 @@ export interface TonightForm {
   adding: boolean;
   newName: string;
   newIcon: string;
+  /** "Enter times myself" open — for backdating without the timer. */
+  manualTimes: boolean;
 }
 
 export interface PatternsForm {

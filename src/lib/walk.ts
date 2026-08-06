@@ -20,10 +20,15 @@ export const draftTotals = (draft: Draft): DraftTotals => ({
   road: draft.road || 0,
 });
 
-/** True when the draft has at least one of: sightings, road count, a time range. */
+/**
+ * True when the draft has at least one of: sightings, road count, a time
+ * range. Both ends stamped counts as a range even at zero minutes — the
+ * timer's Start and Stop tapped within the same clock minute is still a
+ * deliberately recorded walk (duration stores as null).
+ */
 export const isDraftSaveable = (draft: Draft): boolean => {
   const { total, mins, road } = draftTotals(draft);
-  return Boolean(total || mins || road);
+  return Boolean(total || mins || road || (draft.time && draft.endTime));
 };
 
 /**

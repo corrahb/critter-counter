@@ -23,7 +23,7 @@ import {
   sortWalks,
 } from "../storage";
 import { DEFAULT_SPECIES, SEED_RECORDS } from "../../data/constants";
-import { today } from "../time";
+import { today, yesterday } from "../time";
 import type { State, Walk } from "../../types";
 
 /** In-memory localStorage stand-in with per-key failure injection. */
@@ -494,7 +494,7 @@ describe("daily snapshots", () => {
 });
 
 describe("draft", () => {
-  it("round-trips today's draft", () => {
+  it("round-trips today's draft, running timer included", () => {
     const kv = fakeKV();
     const d = {
       date: today(),
@@ -504,9 +504,26 @@ describe("draft", () => {
       endTime: "",
       weather: null,
       note: "mid-walk",
+      walking: true,
     };
     saveDraft(kv, d);
+    // closing the app mid-walk must NOT stop the timer
     expect(loadDraft(kv)).toEqual(d);
+  });
+
+  it("a walking flag without a start time is dropped (can't time an unstarted walk)", () => {
+    const kv = fakeKV();
+    saveDraft(kv, {
+      date: today(),
+      counts: {},
+      road: 0,
+      time: "",
+      endTime: "",
+      weather: null,
+      note: "",
+      walking: true,
+    });
+    expect(loadDraft(kv)?.walking).toBe(false);
   });
 
   it("ignores a stale draft from another day", () => {
@@ -519,6 +536,56 @@ describe("draft", () => {
       endTime: "",
       weather: null,
       note: "",
+    });
+    expect(loadDraft(kv)).toBeNull();
+  });
+
+  it("a walk still RUNNING from yesterday survives midnight — timer, counts, and date intact", () => {
+    const kv = fakeKV();
+    const d = {
+      date: yesterday(), // started 23:45, phone reopened past midnight
+      counts: { rabbit: 3 },
+      road: 1,
+      time: "23:45",
+      endTime: "",
+      weather: null,
+      note: "",
+      walking: true,
+    };
+    saveDraft(kv, d);
+    const restored = loadDraft(kv);
+    expect(restored).not.toBeNull();
+    expect(restored!.walking).toBe(true);
+    expect(restored!.counts).toEqual({ rabbit: 3 });
+    expect(restored!.date).toBe(yesterday()); // the walk keeps the night it started
+  });
+
+  it("yesterday's draft withOUT a running walk is still stale", () => {
+    const kv = fakeKV();
+    saveDraft(kv, {
+      date: yesterday(),
+      counts: { rabbit: 3 },
+      road: 0,
+      time: "23:45",
+      endTime: "23:59", // stopped — finished walk left unsaved = abandoned
+      weather: null,
+      note: "",
+      walking: false,
+    });
+    expect(loadDraft(kv)).toBeNull();
+  });
+
+  it("a running walk from TWO days ago is abandoned, not live", () => {
+    const kv = fakeKV();
+    saveDraft(kv, {
+      date: "2020-01-01",
+      counts: {},
+      road: 0,
+      time: "23:45",
+      endTime: "",
+      weather: null,
+      note: "",
+      walking: true,
     });
     expect(loadDraft(kv)).toBeNull();
   });
@@ -562,6 +629,7 @@ describe("draft", () => {
     expect(d.endTime).toBe("");
     expect(d.weather).toBeNull();
     expect(d.note).toBe("");
+    expect(d.walking).toBe(false); // junk "walking" never fabricates a timer
   });
 
   it("normalizeDraft handles a non-object", () => {

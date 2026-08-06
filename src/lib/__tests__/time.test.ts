@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { addMins, fmtMins, fmtTime, hourLabel, minsBetween, prettyDate, today } from "../time";
+import {
+  addMins,
+  fmtMins,
+  fmtTime,
+  hourLabel,
+  minsBetween,
+  prettyDate,
+  today,
+  yesterday,
+} from "../time";
 
 describe("minsBetween", () => {
   it("computes a plain evening walk", () => {
@@ -115,6 +124,29 @@ describe("today — the headline fix of the port", () => {
 
   it("is in ISO form", () => {
     expect(today()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("yesterday", () => {
+  it("is the local day before today, even when UTC has already rolled over twice", () => {
+    vi.useFakeTimers();
+    try {
+      // 2026-08-05 03:30 UTC = 2026-08-04 23:30 in Toronto
+      vi.setSystemTime(new Date("2026-08-05T03:30:00Z"));
+      expect(yesterday()).toBe("2026-08-03");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("crosses month boundaries", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-01T16:00:00Z")); // noon Aug 1 in Toronto
+      expect(yesterday()).toBe("2026-07-31");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

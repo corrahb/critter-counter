@@ -30,7 +30,7 @@
  */
 import type { Draft, Records, Species, State, Walk, WeatherId } from "../types";
 import { DEFAULT_SPECIES, SEED_RECORDS, WEATHER } from "../data/constants";
-import { minsBetween, today } from "./time";
+import { minsBetween, today, yesterday } from "./time";
 import { newWalkId } from "./id";
 
 export const MAIN_KEY = "critter-counter/v1";
@@ -218,7 +218,9 @@ export function snapshotDaily(kv: KV, prevText: string, date: string = today()):
     kv.setItem(SNAP_PREFIX + date, prevText);
     const next = [date, ...index].sort().reverse().slice(0, MAX_SNAPSHOTS);
     kv.setItem(SNAP_INDEX_KEY, JSON.stringify(next));
-    for (const old of index) {
+    // prune from the UNION — the just-written key itself may have been
+    // sliced out, and it isn't in the old index
+    for (const old of [date, ...index]) {
       if (!next.includes(old)) kv.removeItem(SNAP_PREFIX + old);
     }
   } catch {
@@ -283,7 +285,9 @@ function stashPreRestore(kv: KV, prevText: string): void {
     kv.setItem(PRE_RESTORE_PREFIX + ts, prevText);
     const next = [ts, ...index].sort().reverse().slice(0, MAX_PRE_RESTORES);
     kv.setItem(PRE_RESTORE_INDEX_KEY, JSON.stringify(next));
-    for (const old of index) {
+    // prune from the UNION — same-millisecond stashes can sort the new
+    // key out of `next`, and it isn't in the old index
+    for (const old of [ts, ...index]) {
       if (!next.includes(old)) kv.removeItem(PRE_RESTORE_PREFIX + old);
     }
   } catch {
@@ -491,6 +495,7 @@ export const emptyDraft = (): Draft => ({
   endTime: "",
   weather: null,
   note: "",
+  walking: false,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration boundary
@@ -512,6 +517,8 @@ export function normalizeDraft(raw: any): Draft {
     endTime: typeof raw.endTime === "string" ? raw.endTime : "",
     weather: WEATHER_IDS.has(raw.weather) ? (raw.weather as WeatherId) : null,
     note: typeof raw.note === "string" ? raw.note : "",
+    // a mid-walk draft reopened later keeps its running timer
+    walking: raw.walking === true && typeof raw.time === "string" && raw.time !== "",
   };
 }
 
@@ -523,13 +530,25 @@ export function saveDraft(kv: KV, draft: Draft): void {
   }
 }
 
-/** Only restores a draft from TODAY — yesterday's abandoned draft is stale. */
+/**
+ * Restores a draft from TODAY — yesterday's abandoned draft is stale.
+ * ONE exemption: a still-running walk (walking, started, never stopped)
+ * dated yesterday is a live walk that crossed midnight, not an abandoned
+ * form — dropping it would destroy the timer and every count mid-walk.
+ */
 export function loadDraft(kv: KV): Draft | null {
   try {
     const t = kv.getItem(DRAFT_KEY);
     if (!t) return null;
     const p = JSON.parse(t);
-    if (!p || p.date !== today()) return null;
+    if (!p) return null;
+    const liveAcrossMidnight =
+      p.walking === true &&
+      typeof p.time === "string" &&
+      p.time !== "" &&
+      !p.endTime &&
+      p.date === yesterday();
+    if (p.date !== today() && !liveAcrossMidnight) return null;
     return normalizeDraft(p);
   } catch {
     return null;

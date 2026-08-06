@@ -1,5 +1,11 @@
 /* ── TONIGHT — the counting screen, ported exactly ──────────── */
-import type { Dispatch, SetStateAction } from "react";
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import type { WalkLog } from "../hooks/useWalkLog";
 import type { TonightForm } from "./forms";
 import { C, card, ghostBtn, primaryBtn } from "../theme";
@@ -28,6 +34,34 @@ export function Tonight({
 
   const draftRoad = draft.road || 0;
   const onRoad = draftRoad > 0;
+
+  /* live elapsed while walking — re-render every 30s so the button ticks */
+  const walking = draft.walking === true;
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!walking) return;
+    const t = setInterval(() => setTick((x) => x + 1), 30_000);
+    return () => clearInterval(t);
+  }, [walking]);
+  const nowHHMM = () => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+  const elapsed = walking && draft.time ? minsBetween(draft.time, nowHHMM()) : 0;
+  const showTimes = !walking && (Boolean(draft.time) || Boolean(draft.endTime) || form.manualTimes);
+  const bothTimes = Boolean(draft.time && draft.endTime);
+
+  const timePill: CSSProperties = {
+    width: 108,
+    flexShrink: 0,
+    padding: "11px 8px",
+    borderRadius: 12,
+    textAlign: "center",
+    border: `1px solid ${C.sprig}`,
+    background: C.fern,
+    color: C.cream,
+    fontSize: 16, // <16px makes mobile Safari auto-zoom on focus
+  };
 
   return (
     <main style={{ padding: "18px 20px 0", display: "grid", gap: 14 }} className="fade">
@@ -328,86 +362,114 @@ export function Tonight({
           </span>
         </div>
 
-        {(
-          [
-            ["Started", "time", "Start time"],
-            ["Finished", "endTime", "End time"],
-          ] as const
-        ).map(([label, field, aria]) => (
-          <div key={field} style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 11 }}>
-            <span
-              style={{
-                width: 62,
-                flexShrink: 0,
-                font: "500 12px 'Azeret Mono', monospace",
-                letterSpacing: ".1em",
-                textTransform: "uppercase",
-                color: C.sage,
-              }}
-            >
-              {label}
-            </span>
-            <input
-              type="time"
-              value={draft[field]}
-              aria-label={aria}
-              onChange={(e) => setDraftField(field, e.target.value)}
-              style={{
-                flex: 1,
-                minWidth: 0,
-                padding: "12px 14px",
-                borderRadius: 11,
-                border: `1px solid ${C.sprig}`,
-                background: C.moss,
-                color: C.cream,
-                fontSize: 16,
-              }}
-            />
-            <button
-              className="tap"
-              onClick={() => {
-                const d = new Date();
-                const now = `${String(d.getHours()).padStart(2, "0")}:${String(
-                  d.getMinutes(),
-                ).padStart(2, "0")}`;
-                setDraftField(field, now);
-              }}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 11,
-                flexShrink: 0,
-                cursor: "pointer",
-                border: `1px solid ${C.sprig}`,
-                background: "transparent",
-                color: C.mint,
-                font: "600 13px 'Azeret Mono', monospace",
-              }}
-            >
-              Now
-            </button>
-          </div>
-        ))}
-
-        {draft.time && draft.endTime && (
-          <div
+        {/* ONE button: Start walk ↔ Stop walk (live elapsed while out) */}
+        {!walking ? (
+          <button
+            onClick={() => log.startWalk()}
+            className="tap"
+            style={{ ...primaryBtn, width: "100%", marginTop: 13, padding: "16px", fontSize: 16 }}
+          >
+            {/* U+25B8, not U+25B6 — the latter is emoji-eligible and
+                renders as a color emoji on Android, ignoring our color */}
+            ▸ &nbsp;Start walk
+          </button>
+        ) : (
+          <button
+            onClick={() => log.stopWalk()}
+            className="tap"
             style={{
-              marginTop: 14,
-              padding: "11px 14px",
-              borderRadius: 11,
-              background: "rgba(147,216,176,.1)",
-              border: "1px solid rgba(147,216,176,.3)",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 10,
+              width: "100%",
+              marginTop: 13,
+              padding: "16px",
+              borderRadius: 13,
+              cursor: "pointer",
+              border: `1.5px solid ${C.blossom}`,
+              background: "rgba(244,167,185,.12)",
+              color: C.blossom,
+              font: "700 16px 'Karla', sans-serif",
             }}
           >
-            <span style={{ fontSize: 14, color: C.cream }}>
-              {fmtTime(draft.time)} → {fmtTime(draft.endTime)}
-            </span>
-            <span style={{ font: "700 15px 'Azeret Mono', monospace", color: C.mint, flexShrink: 0 }}>
-              {fmtMins(minsBetween(draft.time, draft.endTime))}
-            </span>
+            ■ &nbsp;Stop walk
+            {elapsed > 0 && (
+              <span style={{ fontFamily: "'Azeret Mono', monospace" }}> · {fmtMins(elapsed)}</span>
+            )}
+          </button>
+        )}
+
+        {walking && draft.time && (
+          <div style={{ marginTop: 9, textAlign: "center", fontSize: 13, color: C.sage }}>
+            started {fmtTime(draft.time)} — counts still tap while you walk
+          </div>
+        )}
+
+        {/* the recorded times as one connected piece — tap either end to fix it */}
+        {showTimes && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", marginTop: 14 }}>
+              <input
+                type="time"
+                value={draft.time}
+                aria-label="Start time"
+                onChange={(e) => setDraftField("time", e.target.value)}
+                style={timePill}
+              />
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: 14,
+                  height: 2,
+                  background: C.sprig,
+                  position: "relative",
+                  margin: "0 -1px",
+                }}
+              >
+                <span style={{ position: "absolute", left: 0, top: -3, width: 8, height: 8, borderRadius: "50%", background: C.mint }} />
+                <span style={{ position: "absolute", right: 0, top: -3, width: 8, height: 8, borderRadius: "50%", background: C.mint }} />
+              </div>
+              <input
+                type="time"
+                value={draft.endTime}
+                aria-label="End time"
+                onChange={(e) => setDraftField("endTime", e.target.value)}
+                style={timePill}
+              />
+            </div>
+            {bothTimes && (
+              <div style={{ marginTop: 10, textAlign: "center" }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "5px 13px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(147,216,176,.35)",
+                    color: C.mint,
+                    font: "600 13px 'Azeret Mono', monospace",
+                  }}
+                >
+                  {fmtTime(draft.time)} → {fmtTime(draft.endTime)} · {fmtMins(minsBetween(draft.time, draft.endTime))}
+                </span>
+              </div>
+            )}
+          </>
+        )}
+
+        {!walking && !showTimes && (
+          <div style={{ marginTop: 9, textAlign: "center" }}>
+            <button
+              onClick={() => setForm((f) => ({ ...f, manualTimes: true }))}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                minHeight: 34,
+                color: C.sage,
+                font: "500 13px 'Karla', sans-serif",
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+              }}
+            >
+              Enter times myself (for last night's walk)
+            </button>
           </div>
         )}
 
@@ -482,7 +544,11 @@ export function Tonight({
       <button
         onClick={() => {
           const beat = log.saveWalk();
-          if (beat !== null) onSaved(beat);
+          if (beat !== null) {
+            // fold the manual time pills back up for the next fresh draft
+            setForm((f) => ({ ...f, manualTimes: false }));
+            onSaved(beat);
+          }
         }}
         className="tap"
         style={{ ...primaryBtn, padding: "18px", fontSize: 17 }}
