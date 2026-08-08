@@ -12,12 +12,15 @@ import {
   listSnapshots,
   loadDraft,
   loadPreRestore,
+  loadPrefs,
   loadSnapshot,
   loadState,
   normalizeDraft,
+  normalizePrefs,
   normalizeState,
   normalizeWalk,
   saveDraft,
+  savePrefs,
   saveState,
   snapshotDaily,
   sortWalks,
@@ -635,5 +638,48 @@ describe("draft", () => {
   it("normalizeDraft handles a non-object", () => {
     expect(normalizeDraft("garbage").counts).toEqual({});
     expect(normalizeDraft(null).road).toBe(0);
+  });
+});
+
+describe("prefs", () => {
+  it("round-trips, rounding coordinates to ~1 km", () => {
+    const kv = fakeKV();
+    savePrefs(kv, { lat: 43.6489217, lon: -79.3812345, season: "winter" });
+    expect(loadPrefs(kv)).toEqual({ lat: 43.65, lon: -79.38, season: "winter" });
+  });
+
+  it("defaults on a fresh device and on corrupt JSON", () => {
+    const kv = fakeKV();
+    expect(loadPrefs(kv)).toEqual({ lat: null, lon: null, season: "auto" });
+    kv.setItem("critter-counter/prefs/v1", "{nope");
+    expect(loadPrefs(kv)).toEqual({ lat: null, lon: null, season: "auto" });
+  });
+
+  it("rejects impossible coordinates and unknown seasons", () => {
+    expect(normalizePrefs({ lat: 91, lon: 0, season: "spring" })).toEqual({
+      lat: null,
+      lon: null,
+      season: "spring",
+    });
+    expect(normalizePrefs({ lat: 43, lon: -181, season: "monsoon" })).toEqual({
+      lat: null,
+      lon: null,
+      season: "auto",
+    });
+    expect(normalizePrefs({ lat: "43.65", lon: "-79.38", season: "auto" })).toEqual({
+      lat: 43.65,
+      lon: -79.38,
+      season: "auto",
+    });
+  });
+
+  it("null location stays null — Number(null) must not become 0°,0°", () => {
+    expect(normalizePrefs({ lat: null, lon: null, season: "winter" })).toEqual({
+      lat: null,
+      lon: null,
+      season: "winter",
+    });
+    // while genuine 0,0 (a real place) is preserved
+    expect(normalizePrefs({ lat: 0, lon: 0, season: "auto" }).lat).toBe(0);
   });
 });

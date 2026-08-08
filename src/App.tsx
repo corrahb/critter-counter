@@ -8,6 +8,7 @@ import { Tally } from "./components/Tally";
 import { Tonight } from "./screens/Tonight";
 import { Walks } from "./screens/Walks";
 import { Patterns } from "./screens/Patterns";
+import { Scenery, SCENES } from "./components/Scenery";
 import { prettyDate } from "./lib/time";
 import { sum } from "./lib/stats";
 
@@ -40,19 +41,29 @@ export default function App() {
     <div style={shell}>
       <style>{css}</style>
 
-      {/* header */}
+      {/* header — the seasonal forest lives here, behind the text.
+          (gradients can't cross-fade, so no transition: the swap snaps,
+          exactly as the prototype's did) */}
       <header
         style={{
+          position: "relative",
           padding: "26px 20px 20px",
           background: onRoad
             ? `linear-gradient(170deg, #33222B 0%, ${C.moss} 78%)`
-            : `linear-gradient(170deg, #1E4232 0%, ${C.moss} 78%)`,
-          transition: "background .5s ease",
+            : `linear-gradient(170deg, ${SCENES[log.effectiveSeason].sky} 0%, ${C.moss} 78%)`,
           borderBottom: `1px solid ${C.sprig}`,
         }}
       >
+        <Scenery season={log.effectiveSeason} />
         <div
-          style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            gap: 10,
+          }}
         >
           <div
             style={{
@@ -65,15 +76,17 @@ export default function App() {
             Critter Counter
           </div>
           <div style={{ minWidth: 0, textAlign: "right" }}>
-            <Eyebrow color={onRoad ? C.blossom : C.sage}>
+            {/* lighter than C.sage: 11px text over the season skies needs
+                ≥4.5:1, and sage only manages ~3.6–4.1 against them */}
+            <Eyebrow color={onRoad ? C.blossom : "#A9C5B4"}>
               {view === "tonight" ? prettyDate(log.draft.date) : `${log.walks.length} walks`}
             </Eyebrow>
           </div>
         </div>
 
         {view === "tonight" && (
-          <div style={{ marginTop: 18 }}>
-            <Eyebrow>Seen tonight</Eyebrow>
+          <div style={{ position: "relative", zIndex: 1, marginTop: 18 }}>
+            <Eyebrow color="#A9C5B4">Seen tonight</Eyebrow>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 14, marginTop: 8, minHeight: 34 }}>
               <div
                 style={{

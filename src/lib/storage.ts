@@ -32,6 +32,7 @@ import type { Draft, Records, Species, State, Walk, WeatherId } from "../types";
 import { DEFAULT_SPECIES, SEED_RECORDS, WEATHER } from "../data/constants";
 import { minsBetween, today, yesterday } from "./time";
 import { newWalkId } from "./id";
+import type { Season } from "./season";
 
 export const MAIN_KEY = "critter-counter/v1";
 export const DRAFT_KEY = "critter-counter/draft/v1";
@@ -560,5 +561,61 @@ export function clearDraft(kv: KV): void {
     kv.removeItem(DRAFT_KEY);
   } catch {
     /* best-effort */
+  }
+}
+
+/* ── prefs (location for sunset, scenery season override) ───── */
+
+export const PREFS_KEY = "critter-counter/prefs/v1";
+
+export interface Prefs {
+  /** Rounded to ~2 decimals (±1 km) — plenty for sunset, kind to privacy. */
+  lat: number | null;
+  lon: number | null;
+  /** "auto" follows the calendar; a season pins the scenery. */
+  season: "auto" | Season;
+}
+
+export const defaultPrefs = (): Prefs => ({ lat: null, lon: null, season: "auto" });
+
+const SEASON_IDS = new Set(["auto", "spring", "summer", "autumn", "winter"]);
+
+// Number(null) is 0 — a naive coercion turns "no location" into 0°,0°
+// (a real place with a very wrong sunset), so absent means absent
+const toCoord = (v: unknown): number | null => {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration boundary
+export function normalizePrefs(raw: any): Prefs {
+  const base = defaultPrefs();
+  if (!raw || typeof raw !== "object") return base;
+  const lat = toCoord(raw.lat);
+  const lon = toCoord(raw.lon);
+  const hasCoords = lat != null && lon != null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+  return {
+    lat: hasCoords ? Math.round(lat * 100) / 100 : null,
+    lon: hasCoords ? Math.round(lon * 100) / 100 : null,
+    season: SEASON_IDS.has(raw.season) ? raw.season : "auto",
+  };
+}
+
+export function loadPrefs(kv: KV): Prefs {
+  try {
+    const t = kv.getItem(PREFS_KEY);
+    if (!t) return defaultPrefs();
+    return normalizePrefs(JSON.parse(t));
+  } catch {
+    return defaultPrefs();
+  }
+}
+
+export function savePrefs(kv: KV, prefs: Prefs): void {
+  try {
+    kv.setItem(PREFS_KEY, JSON.stringify(normalizePrefs(prefs)));
+  } catch {
+    /* prefs are a convenience, never load-bearing */
   }
 }

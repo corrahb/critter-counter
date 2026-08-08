@@ -8,6 +8,7 @@ import { Tally } from "../components/Tally";
 import { fmtMins, hourLabel, prettyDate, today } from "../lib/time";
 import { moonOf } from "../lib/moon";
 import { plural } from "../lib/plural";
+import { SEASONS, seasonOf } from "../lib/season";
 import { computeStats, sum } from "../lib/stats";
 import { daysSince } from "../lib/backup";
 
@@ -435,6 +436,45 @@ export function Patterns({
           )}
         </>
       )}
+
+      {/* scenery — the forest follows the calendar unless pinned */}
+      <div style={card}>
+        <Eyebrow>Scenery</Eyebrow>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 11 }}>
+          {[
+            {
+              id: "auto" as const,
+              icon: "🍃",
+              label: `Auto · ${SEASONS.find((x) => x.id === seasonOf(today()))!.label}`,
+            },
+            ...SEASONS.map((s) => ({ id: s.id as "auto" | typeof s.id, icon: s.icon, label: s.label })),
+          ].map((s) => {
+            const on = log.prefs.season === s.id;
+            return (
+              <button
+                key={s.id}
+                className="tap"
+                aria-pressed={on}
+                onClick={() => log.setSeason(s.id)}
+                style={{
+                  padding: "9px 13px",
+                  borderRadius: 999,
+                  cursor: "pointer",
+                  border: `1px solid ${on ? C.mint : C.sprig}`,
+                  background: on ? "rgba(147,216,176,.14)" : "transparent",
+                  color: on ? C.mint : C.sage,
+                  font: "500 13px 'Karla', sans-serif",
+                }}
+              >
+                {s.icon} {s.label}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: 10, fontSize: 12, color: C.sage }}>
+          Changes the forest at the top of the app. Auto follows the calendar.
+        </div>
+      </div>
 
       {/* backup — real files now, clipboard kept for artefact compatibility */}
       <div style={{ height: 6 }} />

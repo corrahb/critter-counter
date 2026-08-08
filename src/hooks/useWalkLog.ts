@@ -14,15 +14,21 @@ import {
   listSnapshots,
   loadDraft,
   loadPreRestore,
+  loadPrefs,
+  normalizePrefs,
   loadSnapshot,
   loadState,
   saveDraft,
+  savePrefs,
   saveState,
   sortWalks,
   type KV,
   type PreRestoreInfo,
+  type Prefs,
   type SnapshotInfo,
 } from "../lib/storage";
+import { seasonOf, type Season } from "../lib/season";
+import { recordBuzz, tapBuzz, timerBuzz } from "../lib/haptics";
 import { applyWalkToRecords } from "../lib/records";
 import { isDraftSaveable, walkFromDraft } from "../lib/walk";
 import { today } from "../lib/time";
@@ -49,6 +55,12 @@ export interface WalkLog {
   snapshots: SnapshotInfo[];
   preRestores: PreRestoreInfo[];
   lastExport: string | null;
+  prefs: Prefs;
+  /** The season the scenery shows — the override, or the calendar's. */
+  effectiveSeason: Season;
+  setSeason: (season: Prefs["season"]) => void;
+  /** Asks the phone for its location (one prompt); resolves false if denied. */
+  useMyLocation: () => Promise<boolean>;
   setToast: (t: string) => void;
   bump: (id: string, delta: number) => void;
   bumpRoad: (delta: number) => void;
@@ -80,6 +92,7 @@ export function useWalkLog(): WalkLog {
   const [species, setSpecies] = useState<Species[]>(boot.state.species);
   const [records, setRecords] = useState<Records>(boot.state.records);
   const [draft, setDraft] = useState<Draft>(() => loadDraft(kv) ?? emptyDraft());
+  const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs(kv));
   const [err, setErr] = useState("");
   const [toast, setToast] = useState(
     boot.healedFrom ? `Recovered your log from the ${boot.healedFrom} snapshot.` : "",
@@ -168,14 +181,22 @@ export function useWalkLog(): WalkLog {
     return () => window.removeEventListener("cc-offline-ready", onReady);
   }, []);
 
-  const bump = (id: string, delta: number) =>
+  const bump = (id: string, delta: number) => {
+    // buzz only when the count actually changes — eyes-free use treats the
+    // buzz as confirmation, and a −1 at zero must not fake one
+    const cur = draft.counts[id] || 0;
+    if (Math.max(0, cur + delta) !== cur) tapBuzz();
     setDraft((d) => ({
       ...d,
       counts: { ...d.counts, [id]: Math.max(0, (d.counts[id] || 0) + delta) },
     }));
+  };
 
-  const bumpRoad = (delta: number) =>
+  const bumpRoad = (delta: number) => {
+    const cur = draft.road || 0;
+    if (Math.max(0, cur + delta) !== cur) tapBuzz();
     setDraft((d) => ({ ...d, road: Math.max(0, (d.road || 0) + delta) }));
+  };
 
   const setRoad = (raw: string) => {
     const v = parseInt(String(raw).replace(/[^\d]/g, ""), 10);
@@ -194,6 +215,7 @@ export function useWalkLog(): WalkLog {
      SYNCHRONOUSLY instead of riding the 900ms tally debounce, so
      pocketing the phone right after the tap can't lose the stamp. */
   const startWalk = () => {
+    timerBuzz();
     // starting a live walk means the walk is happening NOW — re-stamp the
     // date too, so a leftover backdated draft can't mislabel it
     const next: Draft = { ...draft, date: today(), time: nowHHMM(), endTime: "", walking: true };
@@ -202,6 +224,7 @@ export function useWalkLog(): WalkLog {
   };
 
   const stopWalk = () => {
+    timerBuzz();
     const next: Draft = { ...draft, endTime: nowHHMM(), walking: false };
     setDraft(next);
     saveDraft(kv, next);
@@ -231,9 +254,50 @@ export function useWalkLog(): WalkLog {
     setRecords(nextRecords);
     setDraft(emptyDraft());
     clearDraft(kv);
+    if (beaten.length) recordBuzz();
     setToast(beaten.length ? `New record — ${beaten.join(", ")}.` : "Walk saved.");
     return beaten.length > 0;
   };
+
+  const effectiveSeason: Season = prefs.season === "auto" ? seasonOf(today()) : prefs.season;
+
+  const setSeason = (season: Prefs["season"]) => {
+    const next = { ...prefs, season };
+    setPrefs(next);
+    savePrefs(kv, next);
+  };
+
+  const useMyLocation = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      if (!("geolocation" in navigator)) {
+        setToast("This phone won't share its location with the app.");
+        resolve(false);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          // functional updater: the fix can arrive many seconds later, and
+          // a season change made meanwhile must not be clobbered by a
+          // stale closure
+          setPrefs((p) => {
+            const next = normalizePrefs({
+              ...p,
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude,
+            });
+            savePrefs(kv, next);
+            return next;
+          });
+          setToast("Got it — sunset times are on.");
+          resolve(true);
+        },
+        () => {
+          setToast("Couldn't get your location — sunset stays off.");
+          resolve(false);
+        },
+        { timeout: 12_000, maximumAge: 3_600_000 },
+      );
+    });
 
   const deleteWalk = (id: string) => {
     const next = walks.filter((w) => w.id !== id);
@@ -362,6 +426,10 @@ export function useWalkLog(): WalkLog {
     snapshots,
     preRestores,
     lastExport,
+    prefs,
+    effectiveSeason,
+    setSeason,
+    useMyLocation,
     setToast,
     bump,
     bumpRoad,

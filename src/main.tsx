@@ -13,6 +13,10 @@ registerSW({
   },
 });
 
+// ask Chrome to shield this origin's storage from automatic eviction —
+// granted silently for installed PWAs, and the walk log lives there
+navigator.storage?.persist?.().catch(() => {});
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

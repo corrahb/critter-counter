@@ -14,6 +14,7 @@ import { Tally } from "../components/Tally";
 import { ICONS, WEATHER } from "../data/constants";
 import { fmtMins, fmtTime, minsBetween, today } from "../lib/time";
 import { moonOf } from "../lib/moon";
+import { duskPhase, sunsetAt } from "../lib/sun";
 
 export function Tonight({
   log,
@@ -35,14 +36,25 @@ export function Tonight({
   const draftRoad = draft.road || 0;
   const onRoad = draftRoad > 0;
 
-  /* live elapsed while walking — re-render every 30s so the button ticks */
+  /* time-based re-render: every 30s while the timer runs OR while the
+     dusk strip is shown (its phrasing tracks the clock), plus a bump
+     whenever the app is resumed from the background — otherwise a
+     backgrounded PWA shows a passed sunset as still upcoming */
   const walking = draft.walking === true;
+  const hasLocation = log.prefs.lat != null && log.prefs.lon != null;
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (!walking) return;
+    if (!walking && !hasLocation) return;
     const t = setInterval(() => setTick((x) => x + 1), 30_000);
     return () => clearInterval(t);
-  }, [walking]);
+  }, [walking, hasLocation]);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setTick((x) => x + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
   const nowHHMM = () => {
     const d = new Date();
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -63,8 +75,52 @@ export function Tonight({
     fontSize: 16, // <16px makes mobile Safari auto-zoom on focus
   };
 
+  const sunset = hasLocation ? sunsetAt(log.prefs.lat!, log.prefs.lon!, today()) : null;
+  const sunsetLine = (() => {
+    if (!sunset) return null;
+    const hhmm = `${String(sunset.getHours()).padStart(2, "0")}:${String(sunset.getMinutes()).padStart(2, "0")}`;
+    const phase = duskPhase(sunset);
+    if (phase === "before") return `🌇 Sunset at ${fmtTime(hhmm)} tonight`;
+    if (phase === "prime") return `🌇 Sunset ${fmtTime(hhmm)} — prime critter hours`;
+    return `🌙 Sunset was ${fmtTime(hhmm)}`;
+  })();
+
   return (
     <main style={{ padding: "18px 20px 0", display: "grid", gap: 14 }} className="fade">
+      {/* dusk line — sunset computed on-device from cached location */}
+      {sunsetLine ? (
+        <div
+          style={{
+            textAlign: "center",
+            fontSize: 13,
+            color: duskPhase(sunset!) === "prime" ? C.mint : C.sage,
+            fontFamily: "'Azeret Mono', monospace",
+            padding: "2px 0",
+          }}
+        >
+          {sunsetLine}
+        </div>
+      ) : (
+        log.prefs.lat == null && (
+          <button
+            onClick={() => log.useMyLocation()}
+            className="tap"
+            style={{
+              background: "none",
+              border: `1px dashed ${C.sprig}`,
+              borderRadius: 12,
+              cursor: "pointer",
+              minHeight: 38,
+              padding: "9px 12px",
+              color: C.sage,
+              font: "500 13px 'Karla', sans-serif",
+            }}
+          >
+            🌇 Show tonight's sunset time — uses your location, once, kept on this phone
+          </button>
+        )
+      )}
+
       {/* species counters — the whole row adds one, so nothing sits off-screen */}
       <div style={{ display: "grid", gap: 9 }}>
         <div
