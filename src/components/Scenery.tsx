@@ -18,8 +18,8 @@ type ParticleKind = "petal" | "firefly" | "leaf" | "snow" | "rain";
 interface SeasonSpec {
   /** Sky at full day / dusk / full night. The day stops AND every
       weather mix of them are verified ≥4.77:1 against the header's
-      #A9C5B4 eyebrows (scratchpad contrast script, 16 combinations) —
-      change these or the weather targets only in pairs with that check. */
+      #A9C5B4 eyebrows (run: node tools/contrast-check.mjs) — change
+      these or the weather targets only together with that check. */
   skyDay: string;
   skyDusk: string;
   skyNight: string;
