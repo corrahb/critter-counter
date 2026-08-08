@@ -8,11 +8,11 @@ import { Tally } from "./components/Tally";
 import { Tonight } from "./screens/Tonight";
 import { Walks } from "./screens/Walks";
 import { Patterns } from "./screens/Patterns";
-import { Scenery, sceneFor } from "./components/Scenery";
+import { Scenery } from "./components/Scenery";
 import { prettyDate, today } from "./lib/time";
 import { sum } from "./lib/stats";
 import { sunsetAt } from "./lib/sun";
-import { dayBlend } from "./lib/sky";
+import { dayBlend, sceneFor } from "./lib/sky";
 
 type View = "tonight" | "walks" | "patterns";
 
@@ -49,6 +49,9 @@ export default function App() {
     dayBlend(log.effectiveSeason, sunset, log.now),
     log.draft.weather,
   );
+  /* Bunny Road's takeover keeps the dark header regardless of daylight */
+  const tPrimary = onRoad ? C.cream : scene.textPrimary;
+  const tEyebrow = onRoad ? C.blossom : scene.textEyebrow;
 
   return (
     <div style={shell}>
@@ -84,14 +87,17 @@ export default function App() {
               fontVariationSettings: '"SOFT" 30, "WONK" 1',
               letterSpacing: "-.01em",
               flexShrink: 0,
+              color: tPrimary,
+              transition: "color .4s ease",
             }}
           >
             Critter Counter
           </div>
           <div style={{ minWidth: 0, textAlign: "right" }}>
-            {/* lighter than C.sage: 11px text over the season skies needs
-                ≥4.5:1, and sage only manages ~3.6–4.1 against them */}
-            <Eyebrow color={onRoad ? C.blossom : "#A9C5B4"}>
+            {/* text colors come from the scene: dark ink on the daylight
+                sky, cream/#A9C5B4 after dusk falls — the pairing is
+                contrast-swept in tools/contrast-check.mjs */}
+            <Eyebrow color={tEyebrow}>
               {view === "tonight" ? prettyDate(log.draft.date) : `${log.walks.length} walks`}
             </Eyebrow>
           </div>
@@ -99,20 +105,20 @@ export default function App() {
 
         {view === "tonight" && (
           <div style={{ position: "relative", zIndex: 1, marginTop: 18 }}>
-            <Eyebrow color="#A9C5B4">Seen tonight</Eyebrow>
+            <Eyebrow color={tEyebrow}>Seen tonight</Eyebrow>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 14, marginTop: 8, minHeight: 34 }}>
               <div
                 style={{
                   font: "700 40px 'Azeret Mono', monospace",
                   lineHeight: 0.9,
-                  color: onRoad ? C.blossom : C.cream,
+                  color: onRoad ? C.blossom : tPrimary,
                   transition: "color .4s ease",
                 }}
               >
                 {draftTotal}
               </div>
               <div style={{ paddingBottom: 2, flex: 1, minWidth: 0 }}>
-                <Tally n={draftTotal} color={onRoad ? C.blossom : C.cream} h={20} max={18} />
+                <Tally n={draftTotal} color={onRoad ? C.blossom : tPrimary} h={20} max={18} />
               </div>
             </div>
           </div>

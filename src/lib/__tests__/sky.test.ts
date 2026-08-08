@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayBlend, mix3, mixHex, phaseOf } from "../sky";
+import { INK, dayBlend, mix3, mixHex, phaseOf, sceneFor } from "../sky";
 
 describe("mixHex", () => {
   it("interpolates channel-wise", () => {
@@ -91,5 +91,54 @@ describe("phaseOf", () => {
     expect(phaseOf(0.5)).toBe("golden");
     expect(phaseOf(1.2)).toBe("dusk");
     expect(phaseOf(1.8)).toBe("night");
+  });
+});
+
+describe("sceneFor — the two text regimes flip exactly once, at dusk", () => {
+  it("daylight is the light regime: ink text, sun out, no fireflies or stars", () => {
+    const s = sceneFor("summer", 0, null);
+    expect(s.light).toBe(true);
+    expect(s.textPrimary).toBe(INK);
+    expect(s.textEyebrow).toBe(INK);
+    expect(s.sun).toBe(true);
+    expect(s.moon).toBe(false);
+    expect(s.stars).toBe(false);
+    expect(s.count).toBe(0); // summer fireflies keep firefly hours
+  });
+
+  it("dusk falls at blend 0.5: dark regime, cream text", () => {
+    const before = sceneFor("summer", 0.49, null);
+    const after = sceneFor("summer", 0.5, null);
+    expect(before.light).toBe(true);
+    expect(after.light).toBe(false);
+    expect(after.textPrimary).toBe("#F0EBDA");
+    expect(after.textEyebrow).toBe("#A9C5B4");
+    expect(after.sun).toBe(false);
+  });
+
+  it("clear nights get moon and stars; cloudy nights get neither", () => {
+    const clear = sceneFor("summer", 2, null);
+    expect(clear.moon).toBe(true);
+    expect(clear.stars).toBe(true);
+    const cloudy = sceneFor("summer", 2, "cloudy");
+    expect(cloudy.moon).toBe(false);
+    expect(cloudy.stars).toBe(false);
+  });
+
+  it("weather overrides work in both regimes", () => {
+    expect(sceneFor("summer", 0, "rain").kind).toBe("rain");
+    expect(sceneFor("summer", 2, "rain").kind).toBe("rain");
+    expect(sceneFor("spring", 0, "snow").kind).toBe("snow");
+    expect(sceneFor("autumn", 1.9, "windy").windy).toBe(true);
+  });
+
+  it("day and dusk skies are actually different (the whole point)", () => {
+    const day = sceneFor("summer", 0, null);
+    const dusk = sceneFor("summer", 1, null);
+    expect(day.sky).not.toBe(dusk.sky);
+    // and dramatically so: the day sky is light, the dusk sky dark
+    const lum = (h: string) =>
+      [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).reduce((a, b) => a + b, 0);
+    expect(lum(day.sky)).toBeGreaterThan(lum(dusk.sky) * 2);
   });
 });
