@@ -8,9 +8,11 @@ import { Tally } from "./components/Tally";
 import { Tonight } from "./screens/Tonight";
 import { Walks } from "./screens/Walks";
 import { Patterns } from "./screens/Patterns";
-import { Scenery, SCENES } from "./components/Scenery";
-import { prettyDate } from "./lib/time";
+import { Scenery, sceneFor } from "./components/Scenery";
+import { prettyDate, today } from "./lib/time";
 import { sum } from "./lib/stats";
+import { sunsetAt } from "./lib/sun";
+import { dayBlend } from "./lib/sky";
 
 type View = "tonight" | "walks" | "patterns";
 
@@ -37,6 +39,17 @@ export default function App() {
   const draftTotal = sum(log.draft.counts);
   const onRoad = (log.draft.road || 0) > 0;
 
+  /* the living sky: season × real time-of-day × tonight's weather chip */
+  const sunset =
+    log.prefs.lat != null && log.prefs.lon != null
+      ? sunsetAt(log.prefs.lat, log.prefs.lon, today())
+      : null;
+  const scene = sceneFor(
+    log.effectiveSeason,
+    dayBlend(log.effectiveSeason, sunset, log.now),
+    log.draft.weather,
+  );
+
   return (
     <div style={shell}>
       <style>{css}</style>
@@ -50,11 +63,11 @@ export default function App() {
           padding: "26px 20px 20px",
           background: onRoad
             ? `linear-gradient(170deg, #33222B 0%, ${C.moss} 78%)`
-            : `linear-gradient(170deg, ${SCENES[log.effectiveSeason].sky} 0%, ${C.moss} 78%)`,
+            : `linear-gradient(170deg, ${scene.sky} 0%, ${C.moss} 78%)`,
           borderBottom: `1px solid ${C.sprig}`,
         }}
       >
-        <Scenery season={log.effectiveSeason} />
+        <Scenery scene={scene} />
         <div
           style={{
             position: "relative",

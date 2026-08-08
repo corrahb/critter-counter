@@ -530,26 +530,37 @@ export function Tonight({
         )}
 
         <div style={{ marginTop: 20 }}>
-          <Eyebrow>Conditions</Eyebrow>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <Eyebrow>Conditions</Eyebrow>
+            <span style={{ fontSize: 12, color: C.sage }}>paints the sky up top</span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 11 }}>
             {WEATHER.map((w) => {
               const on = draft.weather === w.id;
               return (
                 <button
                   key={w.id}
                   className="tap"
+                  aria-pressed={on}
                   onClick={() => setDraftField("weather", on ? null : w.id)}
                   style={{
-                    padding: "9px 13px",
+                    padding: "12px 15px",
                     borderRadius: 999,
                     cursor: "pointer",
-                    border: `1px solid ${on ? C.mint : C.sprig}`,
-                    background: on ? "rgba(147,216,176,.14)" : "transparent",
+                    minHeight: 44,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 7,
+                    border: `1.5px solid ${on ? C.mint : C.sprig}`,
+                    background: on ? "rgba(147,216,176,.16)" : "transparent",
                     color: on ? C.mint : C.sage,
-                    font: "500 13px 'Karla', sans-serif",
+                    font: "500 14px 'Karla', sans-serif",
                   }}
                 >
-                  {w.icon} {w.label}
+                  <span style={{ fontSize: 18, filter: on ? "none" : "grayscale(1) opacity(.7)" }}>
+                    {w.icon}
+                  </span>
+                  {w.label}
                 </button>
               );
             })}

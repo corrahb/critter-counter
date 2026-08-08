@@ -51,6 +51,8 @@ export interface WalkLog {
   draft: Draft;
   err: string;
   toast: string;
+  /** Ticks every minute (and on app resume) — drives the living sky. */
+  now: Date;
   futureSchema: number | null;
   snapshots: SnapshotInfo[];
   preRestores: PreRestoreInfo[];
@@ -93,6 +95,21 @@ export function useWalkLog(): WalkLog {
   const [records, setRecords] = useState<Records>(boot.state.records);
   const [draft, setDraft] = useState<Draft>(() => loadDraft(kv) ?? emptyDraft());
   const [prefs, setPrefs] = useState<Prefs>(() => loadPrefs(kv));
+  const [now, setNow] = useState<Date>(() => new Date());
+
+  /* a minute-grain clock so the sky darkens while the app sits open,
+     refreshed immediately when the app comes back from the background */
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setNow(new Date());
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
   const [err, setErr] = useState("");
   const [toast, setToast] = useState(
     boot.healedFrom ? `Recovered your log from the ${boot.healedFrom} snapshot.` : "",
@@ -422,6 +439,7 @@ export function useWalkLog(): WalkLog {
     draft,
     err,
     toast,
+    now,
     futureSchema: boot.futureSchema,
     snapshots,
     preRestores,
