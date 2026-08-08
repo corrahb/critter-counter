@@ -32,6 +32,12 @@ export default defineConfig({
         // fully offline from the first install
         globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico}"],
         navigateFallback: "/critter-counter/index.html",
+        // a freshly downloaded update takes over immediately instead of
+        // waiting for every window to close — Android keeps installed PWAs
+        // half-alive, which otherwise delays updates by days
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
     }),
   ],
