@@ -10,6 +10,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // registration happens in main.tsx via virtual:pwa-register (so the
+      // app can announce offline-readiness); don't inject a second one
+      injectRegister: false,
       includeAssets: ["fonts/*.woff2", "icons/apple-touch-icon.png"],
       manifest: {
         name: "Critter Counter",

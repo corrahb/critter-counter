@@ -1,6 +1,17 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { registerSW } from "virtual:pwa-register";
 import App from "./App";
+
+registerSW({
+  immediate: true,
+  // fires once, when the app's complete offline copy is safely stored —
+  // the UI turns it into a toast so nobody has to guess whether
+  // airplane-mode is safe yet
+  onOfflineReady() {
+    window.dispatchEvent(new Event("cc-offline-ready"));
+  },
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

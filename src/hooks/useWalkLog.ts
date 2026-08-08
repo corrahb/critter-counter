@@ -160,6 +160,14 @@ export function useWalkLog(): WalkLog {
     return () => clearTimeout(t);
   }, [toast]);
 
+  /* the service worker announces when the full offline copy is stored */
+  useEffect(() => {
+    const onReady = () =>
+      setToast("Saved to your phone — the app now works with no signal at all.");
+    window.addEventListener("cc-offline-ready", onReady);
+    return () => window.removeEventListener("cc-offline-ready", onReady);
+  }, []);
+
   const bump = (id: string, delta: number) =>
     setDraft((d) => ({
       ...d,
