@@ -154,8 +154,11 @@ export function Patterns({
 
       <div style={{ ...card, display: "grid", gap: 16 }}>
         <Eyebrow>Everything else</Eyebrow>
+        {/* an animal earns its row at a record of 2+ — one stray sighting
+            (or a zero) doesn't clutter the list; it appears automatically
+            once a saved walk beats 1 */}
         {species
-          .filter((s) => s.id !== "rabbit")
+          .filter((s) => s.id !== "rabbit" && (records[s.id]?.value ?? 0) >= 2)
           .map((s) => smallRecord(s.id, s.icon, `Most ${plural(s.name).toLowerCase()}`))}
         <div style={{ height: 1, background: C.sprig }} />
         {smallRecord("duration", "⏱", "Longest walk (minutes)", fmtMins)}

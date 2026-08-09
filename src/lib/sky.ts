@@ -21,7 +21,7 @@ export const mix3 = (day: string, dusk: string, night: string, t: number): strin
   t <= 1 ? mixHex(day, dusk, t) : mixHex(dusk, night, t - 1);
 
 /** Rough southern-Ontario sunset minutes when no location is cached. */
-const APPROX_SUNSET_MIN: Record<Season, number> = {
+export const APPROX_SUNSET_MIN: Record<Season, number> = {
   winter: 17 * 60,
   spring: 20 * 60,
   summer: 20 * 60 + 45,

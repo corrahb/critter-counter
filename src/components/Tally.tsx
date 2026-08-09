@@ -26,7 +26,8 @@ export function Tally({ n, color = C.cream, h = 22, gap = 7, max = 24 }: TallyPr
   for (let i = 0; i < full; i++) groups.push(5);
   if (shown % 5) groups.push(shown % 5);
 
-  if (total === 0) return <span style={{ color: C.sage, fontSize: h * 0.6 }}>—</span>;
+  // zero renders NOTHING — the placeholder dash read as clutter
+  if (total === 0) return null;
 
   return (
     <span

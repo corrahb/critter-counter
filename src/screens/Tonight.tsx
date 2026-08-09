@@ -15,6 +15,7 @@ import { ICONS, WEATHER } from "../data/constants";
 import { fmtMins, fmtTime, minsBetween, today } from "../lib/time";
 import { moonOf } from "../lib/moon";
 import { duskPhase, sunsetAt } from "../lib/sun";
+import { APPROX_SUNSET_MIN } from "../lib/sky";
 
 export function Tonight({
   log,
@@ -75,51 +76,103 @@ export function Tonight({
     fontSize: 16, // <16px makes mobile Safari auto-zoom on focus
   };
 
-  const sunset = hasLocation ? sunsetAt(log.prefs.lat!, log.prefs.lon!, today()) : null;
+  /* the sunset time always SHOWS — approximate from the season until a
+     cached location makes it exact; tapping the line fine-tunes it */
+  const exactSunset = hasLocation ? sunsetAt(log.prefs.lat!, log.prefs.lon!, today()) : null;
+  const sunset =
+    exactSunset ??
+    (() => {
+      const m = APPROX_SUNSET_MIN[log.effectiveSeason];
+      const d = new Date();
+      d.setHours(Math.floor(m / 60), m % 60, 0, 0);
+      return d;
+    })();
+  const isApprox = exactSunset == null;
   const sunsetLine = (() => {
-    if (!sunset) return null;
     const hhmm = `${String(sunset.getHours()).padStart(2, "0")}:${String(sunset.getMinutes()).padStart(2, "0")}`;
+    const t = isApprox ? `about ${fmtTime(hhmm)}` : fmtTime(hhmm);
     const phase = duskPhase(sunset);
-    if (phase === "before") return `🌇 Sunset at ${fmtTime(hhmm)} tonight`;
-    if (phase === "prime") return `🌇 Sunset ${fmtTime(hhmm)} — prime critter hours`;
-    return `🌙 Sunset was ${fmtTime(hhmm)}`;
+    if (phase === "before") return `🌇 Sunset ${t} tonight`;
+    if (phase === "prime") return `🌇 Sunset ${t} — prime critter hours`;
+    return `🌙 Sunset was ${t}`;
   })();
 
   return (
     <main style={{ padding: "18px 20px 0", display: "grid", gap: 14 }} className="fade">
-      {/* dusk line — sunset computed on-device from cached location */}
-      {sunsetLine ? (
+      {/* dusk line — always shows the time; season-approximate until one
+          tap caches the location and makes it exact */}
+      {isApprox ? (
+        <button
+          onClick={() => log.useMyLocation()}
+          aria-label="Fine-tune the sunset time with your location — used once, kept on this phone"
+          style={{
+            textAlign: "center",
+            fontSize: 13,
+            minHeight: 34,
+            color: duskPhase(sunset) === "prime" ? C.mint : C.sage,
+            fontFamily: "'Azeret Mono', monospace",
+            padding: "2px 0",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          {sunsetLine}
+        </button>
+      ) : (
         <div
           style={{
             textAlign: "center",
             fontSize: 13,
-            color: duskPhase(sunset!) === "prime" ? C.mint : C.sage,
+            color: duskPhase(sunset) === "prime" ? C.mint : C.sage,
             fontFamily: "'Azeret Mono', monospace",
             padding: "2px 0",
           }}
         >
           {sunsetLine}
         </div>
-      ) : (
-        log.prefs.lat == null && (
+      )}
+
+      {/* the walk timer lives at the TOP — it's the first thing set out
+          the door (moved here at Victor's request) */}
+      <div>
+        {!walking ? (
           <button
-            onClick={() => log.useMyLocation()}
+            onClick={() => log.startWalk()}
+            className="tap"
+            style={{ ...primaryBtn, width: "100%", padding: "16px", fontSize: 16 }}
+          >
+            {/* U+25B8, not U+25B6 — the latter is emoji-eligible and
+                renders as a color emoji on Android, ignoring our color */}
+            ▸ &nbsp;Start walk
+          </button>
+        ) : (
+          <button
+            onClick={() => log.stopWalk()}
             className="tap"
             style={{
-              background: "none",
-              border: `1px dashed ${C.sprig}`,
-              borderRadius: 12,
+              width: "100%",
+              padding: "16px",
+              borderRadius: 13,
               cursor: "pointer",
-              minHeight: 38,
-              padding: "9px 12px",
-              color: C.sage,
-              font: "500 13px 'Karla', sans-serif",
+              border: `1.5px solid ${C.blossom}`,
+              background: "rgba(244,167,185,.12)",
+              color: C.blossom,
+              font: "700 16px 'Karla', sans-serif",
             }}
           >
-            🌇 Show tonight's sunset time — uses your location, once, kept on this phone
+            ■ &nbsp;Stop walk
+            {elapsed > 0 && (
+              <span style={{ fontFamily: "'Azeret Mono', monospace" }}> · {fmtMins(elapsed)}</span>
+            )}
           </button>
-        )
-      )}
+        )}
+        {walking && draft.time && (
+          <div style={{ marginTop: 9, textAlign: "center", fontSize: 13, color: C.sage }}>
+            started {fmtTime(draft.time)} — counts still tap while you walk
+          </div>
+        )}
+      </div>
 
       {/* species counters — the whole row adds one, so nothing sits off-screen */}
       <div style={{ display: "grid", gap: 9 }}>
@@ -132,7 +185,6 @@ export function Tonight({
           }}
         >
           <Eyebrow>Tap a row to add one</Eyebrow>
-          <span style={{ fontSize: 12, color: C.sage }}>− undoes</span>
         </div>
 
         {species.map((s) => {
@@ -206,7 +258,7 @@ export function Tonight({
                     font: "700 24px 'Azeret Mono', monospace",
                     color: n ? C.cream : C.sage,
                     minWidth: 28,
-                    textAlign: "right",
+                    textAlign: "center", // sits midway between − and +, not hugging the +
                     flexShrink: 0,
                   }}
                 >
@@ -418,47 +470,9 @@ export function Tonight({
           </span>
         </div>
 
-        {/* ONE button: Start walk ↔ Stop walk (live elapsed while out) */}
-        {!walking ? (
-          <button
-            onClick={() => log.startWalk()}
-            className="tap"
-            style={{ ...primaryBtn, width: "100%", marginTop: 13, padding: "16px", fontSize: 16 }}
-          >
-            {/* U+25B8, not U+25B6 — the latter is emoji-eligible and
-                renders as a color emoji on Android, ignoring our color */}
-            ▸ &nbsp;Start walk
-          </button>
-        ) : (
-          <button
-            onClick={() => log.stopWalk()}
-            className="tap"
-            style={{
-              width: "100%",
-              marginTop: 13,
-              padding: "16px",
-              borderRadius: 13,
-              cursor: "pointer",
-              border: `1.5px solid ${C.blossom}`,
-              background: "rgba(244,167,185,.12)",
-              color: C.blossom,
-              font: "700 16px 'Karla', sans-serif",
-            }}
-          >
-            ■ &nbsp;Stop walk
-            {elapsed > 0 && (
-              <span style={{ fontFamily: "'Azeret Mono', monospace" }}> · {fmtMins(elapsed)}</span>
-            )}
-          </button>
-        )}
-
-        {walking && draft.time && (
-          <div style={{ marginTop: 9, textAlign: "center", fontSize: 13, color: C.sage }}>
-            started {fmtTime(draft.time)} — counts still tap while you walk
-          </div>
-        )}
-
-        {/* the recorded times as one connected piece — tap either end to fix it */}
+        {/* the recorded times as one connected piece — tap either end to
+            fix it (the Start/Stop button itself lives at the top of the
+            screen now) */}
         {showTimes && (
           <>
             <div style={{ display: "flex", alignItems: "center", marginTop: 14 }}>
@@ -530,10 +544,7 @@ export function Tonight({
         )}
 
         <div style={{ marginTop: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <Eyebrow>Conditions</Eyebrow>
-            <span style={{ fontSize: 12, color: C.sage }}>paints the sky up top</span>
-          </div>
+          <Eyebrow>Conditions</Eyebrow>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 11 }}>
             {WEATHER.map((w) => {
               const on = draft.weather === w.id;
