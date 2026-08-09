@@ -30,7 +30,7 @@ import {
 import { seasonOf, type Season } from "../lib/season";
 import { recordBuzz, tapBuzz, timerBuzz } from "../lib/haptics";
 import { applyWalkToRecords } from "../lib/records";
-import { isDraftSaveable, walkFromDraft } from "../lib/walk";
+import { buildWalk, isDraftSaveable, walkFromDraft, type WalkFields } from "../lib/walk";
 import { today } from "../lib/time";
 import {
   lastExportedAt,
@@ -53,6 +53,8 @@ export interface WalkLog {
   toast: string;
   /** Ticks every minute (and on app resume) — drives the living sky. */
   now: Date;
+  /** Bumped on every restore — stale form state must reset on it. */
+  restoreCount: number;
   futureSchema: number | null;
   snapshots: SnapshotInfo[];
   preRestores: PreRestoreInfo[];
@@ -74,6 +76,8 @@ export interface WalkLog {
   stopWalk: () => void;
   /** Returns true when a record was beaten, null when nothing to save. */
   saveWalk: () => boolean | null;
+  /** Edits an existing walk in place; records re-checked. Same returns. */
+  updateWalk: (id: string, fields: WalkFields) => boolean | null;
   deleteWalk: (id: string) => void;
   /** Returns true when the species was actually added (name non-blank, persisted). */
   addSpecies: (name: string, icon: string) => boolean;
@@ -115,6 +119,8 @@ export function useWalkLog(): WalkLog {
     boot.healedFrom ? `Recovered your log from the ${boot.healedFrom} snapshot.` : "",
   );
   const [storageTick, setStorageTick] = useState(0);
+  /** Bumped by every restore path — App clears stale form state on it. */
+  const [restoreCount, setRestoreCount] = useState(0);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstRun = useRef(true);
 
@@ -316,6 +322,32 @@ export function useWalkLog(): WalkLog {
       );
     });
 
+  const updateWalk = (id: string, fields: WalkFields): boolean | null => {
+    const existing = walks.find((w) => w.id === id);
+    if (!existing) return null;
+    const updated = buildWalk(id, fields, existing);
+    // a preserved legacy duration keeps the walk saveable even when the
+    // editable fields alone wouldn't pass the gate
+    if (!isDraftSaveable(fields) && updated.duration == null) {
+      setToast("A walk needs a sighting, a road count, or times.");
+      return null;
+    }
+    const { records: nextRecords, beaten } = applyWalkToRecords({
+      records,
+      species,
+      counts: updated.counts,
+      road: updated.road,
+      mins: updated.duration || 0,
+      date: updated.date,
+    });
+    const next = sortWalks(walks.map((w) => (w.id === id ? updated : w)));
+    if (!persist({ walks: next, records: nextRecords })) return null;
+    setWalks(next);
+    setRecords(nextRecords);
+    setToast(beaten.length ? `Walk updated — new record: ${beaten.join(", ")}.` : "Walk updated.");
+    return beaten.length > 0;
+  };
+
   const deleteWalk = (id: string) => {
     const next = walks.filter((w) => w.id !== id);
     // deleting the final walk is explicit user intent, not a bug to block
@@ -389,6 +421,8 @@ export function useWalkLog(): WalkLog {
     setWalks(state.walks);
     setSpecies(state.species);
     setRecords(state.records);
+    // any open walk-edit form now shows pre-restore values — invalidate it
+    setRestoreCount((c) => c + 1);
     setToast(
       `Restored ${state.walks.length} ${state.walks.length === 1 ? "walk" : "walks"} ${what} — undo is under Safety net.`,
     );
@@ -440,6 +474,7 @@ export function useWalkLog(): WalkLog {
     err,
     toast,
     now,
+    restoreCount,
     futureSchema: boot.futureSchema,
     snapshots,
     preRestores,
@@ -456,6 +491,7 @@ export function useWalkLog(): WalkLog {
     startWalk,
     stopWalk,
     saveWalk,
+    updateWalk,
     deleteWalk,
     addSpecies,
     removeSpecies,

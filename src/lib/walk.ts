@@ -5,7 +5,7 @@
  * diverge from it.
  */
 import type { Draft, Walk } from "../types";
-import { minsBetween } from "./time";
+import { minsBetween, today } from "./time";
 import { newWalkId } from "./id";
 
 export interface DraftTotals {
@@ -31,25 +31,48 @@ export const isDraftSaveable = (draft: Draft): boolean => {
   return Boolean(total || mins || road || (draft.time && draft.endTime));
 };
 
+/** The editable fields of a walk — a Draft minus the running-timer flag. */
+export type WalkFields = Omit<Draft, "walking">;
+
 /**
- * Builds the walk exactly as the prototype did: duration = mins || null,
- * falsy time/endTime → null, note trimmed, zero counts dropped.
+ * Builds a walk exactly as the prototype did: duration = mins || null,
+ * falsy time/endTime → null, note trimmed, zero counts dropped. Shared
+ * by saving a new walk (fresh id) and editing an old one (same id).
+ *
+ * `previous` is the walk being edited. It protects two legacy shapes:
+ * - a stored duration WITHOUT times (schema-1 imports) survives edits
+ *   that don't touch the time fields — deliberately clearing set times
+ *   still clears it
+ * - an emptied date falls back to the walk's own date, never "" (which
+ *   would sort to the bottom and silently re-date to today on reload)
  */
-export function walkFromDraft(draft: Draft): Walk {
-  const { mins, road } = draftTotals(draft);
+export function buildWalk(id: string, fields: WalkFields, previous?: Walk): Walk {
+  const { mins, road } = draftTotals(fields);
   const counts: Record<string, number> = {};
-  for (const [k, v] of Object.entries(draft.counts || {})) {
+  for (const [k, v] of Object.entries(fields.counts || {})) {
     if (v > 0) counts[k] = v;
   }
+  let duration = mins || null;
+  const timesUntouched =
+    previous != null &&
+    (previous.time ?? "") === (fields.time || "") &&
+    (previous.endTime ?? "") === (fields.endTime || "");
+  if (duration == null && timesUntouched && previous.duration != null) {
+    duration = previous.duration;
+  }
   return {
-    id: newWalkId(),
-    date: draft.date,
+    id,
+    date: fields.date || previous?.date || today(),
     counts,
     road,
-    duration: mins || null,
-    time: draft.time || null,
-    endTime: draft.endTime || null,
-    weather: draft.weather || null,
-    note: draft.note.trim(),
+    duration,
+    time: fields.time || null,
+    endTime: fields.endTime || null,
+    weather: fields.weather || null,
+    note: fields.note.trim(),
   };
+}
+
+export function walkFromDraft(draft: Draft): Walk {
+  return buildWalk(newWalkId(), draft);
 }

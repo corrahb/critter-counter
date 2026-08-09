@@ -174,6 +174,42 @@ export function Tonight({
         )}
       </div>
 
+      {/* conditions — set on the way out the door, before any animals */}
+      <div style={{ ...card, padding: "12px 12px 13px" }}>
+        <Eyebrow>Conditions</Eyebrow>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+          {WEATHER.map((w) => {
+            const on = draft.weather === w.id;
+            return (
+              <button
+                key={w.id}
+                className="tap"
+                aria-pressed={on}
+                onClick={() => setDraftField("weather", on ? null : w.id)}
+                style={{
+                  padding: "12px 15px",
+                  borderRadius: 999,
+                  cursor: "pointer",
+                  minHeight: 44,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 7,
+                  border: `1.5px solid ${on ? C.mint : C.sprig}`,
+                  background: on ? "rgba(147,216,176,.16)" : "transparent",
+                  color: on ? C.mint : C.sage,
+                  font: "500 14px 'Karla', sans-serif",
+                }}
+              >
+                <span style={{ fontSize: 18, filter: on ? "none" : "grayscale(1) opacity(.7)" }}>
+                  {w.icon}
+                </span>
+                {w.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* species counters — the whole row adds one, so nothing sits off-screen */}
       <div style={{ display: "grid", gap: 9 }}>
         <div
@@ -538,45 +574,10 @@ export function Tonight({
                 textUnderlineOffset: 3,
               }}
             >
-              Enter times myself (for last night's walk)
+              Enter times myself
             </button>
           </div>
         )}
-
-        <div style={{ marginTop: 20 }}>
-          <Eyebrow>Conditions</Eyebrow>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 11 }}>
-            {WEATHER.map((w) => {
-              const on = draft.weather === w.id;
-              return (
-                <button
-                  key={w.id}
-                  className="tap"
-                  aria-pressed={on}
-                  onClick={() => setDraftField("weather", on ? null : w.id)}
-                  style={{
-                    padding: "12px 15px",
-                    borderRadius: 999,
-                    cursor: "pointer",
-                    minHeight: 44,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 7,
-                    border: `1.5px solid ${on ? C.mint : C.sprig}`,
-                    background: on ? "rgba(147,216,176,.16)" : "transparent",
-                    color: on ? C.mint : C.sage,
-                    font: "500 14px 'Karla', sans-serif",
-                  }}
-                >
-                  <span style={{ fontSize: 18, filter: on ? "none" : "grayscale(1) opacity(.7)" }}>
-                    {w.icon}
-                  </span>
-                  {w.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         <div style={{ marginTop: 20 }}>
           <Eyebrow>Walk date</Eyebrow>
@@ -584,7 +585,11 @@ export function Tonight({
             type="date"
             value={draft.date}
             max={today()}
-            onChange={(e) => setDraftField("date", e.target.value)}
+            onChange={(e) => {
+              // ignore the picker's Clear action — a dateless walk would
+              // silently re-date itself on the next reload
+              if (e.target.value) setDraftField("date", e.target.value);
+            }}
             style={{
               width: "100%",
               marginTop: 9,
@@ -593,7 +598,7 @@ export function Tonight({
               border: `1px solid ${C.sprig}`,
               background: C.moss,
               color: C.cream,
-              fontSize: 15,
+              fontSize: 16, // <16px makes mobile Safari auto-zoom on focus
             }}
           />
         </div>
@@ -612,7 +617,7 @@ export function Tonight({
               border: `1px solid ${C.sprig}`,
               background: C.moss,
               color: C.cream,
-              fontSize: 15,
+              fontSize: 16, // <16px makes mobile Safari auto-zoom on focus
               fontFamily: "'Karla', sans-serif",
             }}
           />

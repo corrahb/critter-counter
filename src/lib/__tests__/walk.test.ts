@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftTotals, isDraftSaveable, walkFromDraft } from "../walk";
+import { buildWalk, draftTotals, isDraftSaveable, walkFromDraft } from "../walk";
 import type { Draft } from "../../types";
 
 const draft = (over: Partial<Draft> = {}): Draft => ({
@@ -90,6 +90,105 @@ describe("walkFromDraft — builds the walk exactly as the prototype did", () =>
     const b = walkFromDraft(draft({ road: 1 }));
     expect(a.id).not.toBe(b.id);
     expect(a.id).toMatch(/^w/);
+  });
+});
+
+describe("buildWalk — editing an existing walk keeps its identity", () => {
+  it("preserves the given id (edits replace, never duplicate)", () => {
+    const w = buildWalk("w-original", {
+      date: "2026-08-07",
+      counts: { rabbit: 4, cat: 0 },
+      road: 2,
+      time: "20:00",
+      endTime: "21:10",
+      weather: "rain",
+      note: "  fixed the missing cat…  ",
+    });
+    expect(w.id).toBe("w-original");
+    expect(w.counts).toEqual({ rabbit: 4 }); // zeroed row dropped
+    expect(w.duration).toBe(70); // recomputed from the edited times
+    expect(w.note).toBe("fixed the missing cat…");
+    expect(w.weather).toBe("rain");
+  });
+
+  it("clearing the times on edit clears the duration too", () => {
+    const w = buildWalk("w1", {
+      date: "2026-08-07",
+      counts: { rabbit: 1 },
+      road: 0,
+      time: "",
+      endTime: "",
+      weather: null,
+      note: "",
+    });
+    expect(w.time).toBeNull();
+    expect(w.endTime).toBeNull();
+    expect(w.duration).toBeNull();
+  });
+
+  const legacyWalk = {
+    id: "w-legacy",
+    date: "2026-07-20",
+    counts: { rabbit: 5 },
+    road: 0,
+    duration: 45, // stored WITHOUT times — real schema-1 import shape
+    time: null,
+    endTime: null,
+    weather: null,
+    note: "old note",
+  } as const;
+
+  it("a legacy stored duration survives an edit that never touched the times", () => {
+    const w = buildWalk("w-legacy", {
+      date: "2026-07-20",
+      counts: { rabbit: 6 }, // the actual edit: one forgotten rabbit
+      road: 0,
+      time: "",
+      endTime: "",
+      weather: null,
+      note: "old note, fixed",
+    }, legacyWalk);
+    expect(w.duration).toBe(45);
+  });
+
+  it("but DELIBERATELY clearing previously set times still clears the duration", () => {
+    const timed = { ...legacyWalk, time: "20:00", endTime: "20:45", duration: 45 };
+    const w = buildWalk("w-legacy", {
+      date: "2026-07-20",
+      counts: { rabbit: 5 },
+      road: 0,
+      time: "", // user cleared what was set — respect it
+      endTime: "",
+      weather: null,
+      note: "",
+    }, timed);
+    expect(w.duration).toBeNull();
+  });
+
+  it("newly entered times beat the stored duration", () => {
+    const w = buildWalk("w-legacy", {
+      date: "2026-07-20",
+      counts: { rabbit: 5 },
+      road: 0,
+      time: "20:00",
+      endTime: "21:00",
+      weather: null,
+      note: "",
+    }, legacyWalk);
+    expect(w.duration).toBe(60);
+  });
+
+  it("an emptied date falls back to the walk's own date, never empty", () => {
+    const w = buildWalk("w-legacy", {
+      date: "", // Android date picker's Clear action
+      counts: { rabbit: 5 },
+      road: 0,
+      time: "",
+      endTime: "",
+      weather: null,
+      note: "",
+    }, legacyWalk);
+    expect(w.date).toBe("2026-07-20");
   });
 });
 

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWalkLog } from "./hooks/useWalkLog";
 import { ICONS } from "./data/constants";
-import type { PatternsForm, TonightForm } from "./screens/forms";
+import type { PatternsForm, TonightForm, WalksForm } from "./screens/forms";
 import { C, css, shell } from "./theme";
 import { Eyebrow } from "./components/bits";
 import { Tally } from "./components/Tally";
@@ -35,6 +35,12 @@ export default function App() {
     restoreText: "",
     safetyOpen: false,
   });
+  const [walksForm, setWalksForm] = useState<WalksForm>({ edit: null });
+  /* a restore replaces the walks an open edit was based on — never let a
+     stale edit form overwrite freshly restored data */
+  useEffect(() => {
+    setWalksForm({ edit: null });
+  }, [log.restoreCount]);
 
   const draftTotal = sum(log.draft.counts);
   const onRoad = (log.draft.road || 0) > 0;
@@ -166,7 +172,7 @@ export default function App() {
           onSaved={(beat) => setView(beat ? "patterns" : "walks")}
         />
       )}
-      {view === "walks" && <Walks log={log} />}
+      {view === "walks" && <Walks log={log} form={walksForm} setForm={setWalksForm} />}
       {view === "patterns" && <Patterns log={log} form={patternsForm} setForm={setPatternsForm} />}
 
       {/* toast */}
